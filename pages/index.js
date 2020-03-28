@@ -56,6 +56,7 @@ class Home extends PureComponent {
     }
 
     setGroupName = (e) => {
+        console.log(e)
         this.setState({
             selectedGroupNames: e[0].GroupName
         }, () => {
