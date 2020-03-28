@@ -1,203 +1,227 @@
+import React, { Component , PureComponent } from 'react';
+import ReactMapGL, { Marker } from 'react-map-gl';
+import dynamic from 'next/dynamic'
 import Head from 'next/head'
+import cmcdata from "../public/cmcdata_subset.json"
+import Dropdowns from "../components/dropdowns"
+import DatePicker from "react-datepicker";
+import { Container, Row, Col } from 'reactstrap';
+import Chart from "../components/dataChart"
+import 'react-dates/initialize';
+import { DateRangePicker, SingleDatePicker, DayPickerRangeController } from 'react-dates';
+import moment from "moment";
+import 'moment-timezone';
 
-const Home = () => (
-  <div className="container">
-    <Head>
-      <title>Create Next App</title>
-      <link rel="icon" href="/favicon.ico" />
-    </Head>
+class Home extends PureComponent {
+    state = {
+        filtered_data: [],
+        chart_data: [],
+        GroupNames: null,
+        variables: null,
+        selectedGroupNames: null,
+        selectedVariables: null,
+        selected: {index: null, StationName: null}, /// individual row selected
+        startDate: moment().subtract(2, "year"),
+        endDate: moment(),
+        availableVariablesAtLocation: null,
+        selectedVariableAtLocation: null
+        };
 
-    <main>
-      <h1 className="title">
-        Welcome to <a href="https://nextjs.org">Next.js!</a>
-      </h1>
 
-      <p className="description">
-        Get started by editing <code>pages/index.js</code>
-      </p>
+    Map = dynamic(() => import('../components/map'), {ssr: false});
 
-      <div className="grid">
-        <a href="https://nextjs.org/docs" className="card">
-          <h3>Documentation &rarr;</h3>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
+    changeLocation = (e) => {
+        console.log(e.index)
+        this.setState({
+            selected : cmcdata.filter((item)=> item['index'] == e.index)[0]
+        }, () => {
+            this.updateChartData()
+        })
+    }
 
-        <a href="https://nextjs.org/learn" className="card">
-          <h3>Learn &rarr;</h3>
-          <p>Learn about Next.js in an interactive course with quizzes!</p>
-        </a>
 
-        <a
-          href="https://github.com/zeit/next.js/tree/master/examples"
-          className="card"
-        >
-          <h3>Examples &rarr;</h3>
-          <p>Discover and deploy boilerplate example Next.js projects.</p>
-        </a>
-
-        <a
-          href="https://zeit.co/import?filter=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          className="card"
-        >
-          <h3>Deploy &rarr;</h3>
-          <p>
-            Instantly deploy your Next.js site to a public URL with ZEIT Now.
-          </p>
-        </a>
-      </div>
-    </main>
-
-    <footer>
-      <a
-        href="https://zeit.co?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        Powered by <img src="/zeit.svg" alt="ZEIT Logo" />
-      </a>
-    </footer>
-
-    <style jsx>{`
-      .container {
-        min-height: 100vh;
-        padding: 0 0.5rem;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-      }
-
-      main {
-        padding: 5rem 0;
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-      }
-
-      footer {
-        width: 100%;
-        height: 100px;
-        border-top: 1px solid #eaeaea;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-
-      footer img {
-        margin-left: 0.5rem;
-      }
-
-      footer a {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-
-      a {
-        color: inherit;
-        text-decoration: none;
-      }
-
-      .title a {
-        color: #0070f3;
-        text-decoration: none;
-      }
-
-      .title a:hover,
-      .title a:focus,
-      .title a:active {
-        text-decoration: underline;
-      }
-
-      .title {
-        margin: 0;
-        line-height: 1.15;
-        font-size: 4rem;
-      }
-
-      .title,
-      .description {
-        text-align: center;
-      }
-
-      .description {
-        line-height: 1.5;
-        font-size: 1.5rem;
-      }
-
-      code {
-        background: #fafafa;
-        border-radius: 5px;
-        padding: 0.75rem;
-        font-size: 1.1rem;
-        font-family: Menlo, Monaco, Lucida Console, Liberation Mono,
-          DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace;
-      }
-
-      .grid {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-wrap: wrap;
-
-        max-width: 800px;
-        margin-top: 3rem;
-      }
-
-      .card {
-        margin: 1rem;
-        flex-basis: 45%;
-        padding: 1.5rem;
-        text-align: left;
-        color: inherit;
-        text-decoration: none;
-        border: 1px solid #eaeaea;
-        border-radius: 10px;
-        transition: color 0.15s ease, border-color 0.15s ease;
-      }
-
-      .card:hover,
-      .card:focus,
-      .card:active {
-        color: #0070f3;
-        border-color: #0070f3;
-      }
-
-      .card h3 {
-        margin: 0 0 1rem 0;
-        font-size: 1.5rem;
-      }
-
-      .card p {
-        margin: 0;
-        font-size: 1.25rem;
-        line-height: 1.5;
-      }
-
-      @media (max-width: 600px) {
-        .grid {
-          width: 100%;
-          flex-direction: column;
+    getUnique = (e, d) => {
+        const result = [];
+        const map = new Map();
+        for (const item of d) {
+            if(!map.has(item[e])){
+                map.set(item[e], true);    // set any value to Map
+                var obj = {};
+                obj[e] = item[e];
+                result.push(obj);
+            }
         }
-      }
-    `}</style>
+        return result
 
-    <style jsx global>{`
-      html,
-      body {
-        padding: 0;
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
-          Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
-      }
+    }
 
-      * {
-        box-sizing: border-box;
-      }
-    `}</style>
-  </div>
-)
+    setGroupName = (e) => {
+        this.setState({
+            selectedGroupNames: e[0].GroupName
+        }, () => {
+        this.setFilteredData()
+        })
+    }
+
+    setVariable = (e) => {
+        this.setState({
+            selectedVariables: e[0].variable
+        }, () => {
+        this.setFilteredData()
+        })
+    }
+
+     setDates = (startDate, endDate) => {
+        this.setState({
+            startDate : startDate,
+            endDate : endDate
+        }, () => {
+        this.setFilteredData()
+        })
+    }
+
+     resetLocation = () => {
+        this.setState({
+            selected: {index: null, StationName: null},
+            chart_data: null,
+            selectedVariableAtLocation: null
+
+            })
+     }
+
+     setVariableAtLocation = (e) => {
+        console.log(e)
+        this.setState({
+            selectedVariableAtLocation: e[0].variable
+        }, () => {
+        this.updateChartData()
+        })
+    }
+
+
+    filterData = () => {
+        const new_data = (this.state.selectedGroupNames)
+                            ? cmcdata.filter((item) => item['GroupName'] == this.state.selectedGroupNames)
+                            : cmcdata
+        const filtered_data = (this.state.selectedVariables)
+                            ? new_data.filter((item) => item['variable'] == this.state.selectedVariables)
+                            : new_data
+        const final_data = (this.state.startDate)
+                            ? filtered_data.filter(a => new Date(a.Date) - this.state.startDate > 0)
+                            : filtered_data
+        const ultimate_data = (this.state.endDate)
+                            ? final_data.filter(a => new Date(a.Date) - this.state.endDate < 0)
+                            : final_data
+
+        return ultimate_data
+    }
+
+
+    setFilteredData = () => {
+        this.resetLocation()
+        const new_data = this.filterData()
+        this.setState({
+                filtered_data : new_data
+            })
+    }
+
+
+    formatVals = (item, objs) => {
+        const a = item.Date
+        const b = parseFloat(item.value)
+        objs[a] = b
+    }
+
+    updateChartData = () => {
+        console.log(this.state.selected.GroupName)
+
+        const chart_data_by_group = (this.state.selected.StationName)
+            ? cmcdata.filter((item) => item['StationName'] == this.state.selected.StationName)
+            : cmcdata
+
+        const newVariables = this.getUnique('variable', chart_data_by_group)
+
+        this.setState({
+            availableVariablesAtLocation: newVariables
+        }, () => {
+        const new_chart_data = (this.state.selectedVariableAtLocation)
+            ? chart_data_by_group.filter((item) => item['variable'] == this.state.selectedVariableAtLocation)
+            : chart_data_by_group.filter((item) => item['variable'] == this.state.availableVariablesAtLocation[0])
+
+        const chart_data = {}
+        new_chart_data.map((item) => {this.formatVals(item, chart_data)})
+
+            this.setState({
+                chart_data: chart_data,
+        })
+
+        })
+    }
+
+
+
+    componentDidMount = () => {
+        this.setState({
+            filtered_data: cmcdata,
+            GroupNames: this.getUnique('GroupName', cmcdata),
+            variables: this.getUnique('variable', cmcdata)
+        })
+    }
+
+    render() {
+        const selected = this.state.selected
+        console.log(selected)
+        return (
+        <Container>
+            <Head></Head>
+            <Row>
+            <Col xs={10} style = {{position: 'fixed'}}>
+                    <this.Map style = {{ height: '700px', width: '100%', zIndex: 1}}  data = {this.state.filtered_data} selected = {this.state.selected} callBack = {this.changeLocation} />
+            </Col>
+            <Col style = {{zIndex: 1001, position: 'relative', height: '400px', opacity: 1, margin: '10px'}} xs={4}>
+                <Row className="justify-content-md-center" style={{ border : "solid 1px #b1b5b5", backgroundColor: 'white', borderRadius: '25px', padding: '20px', margin: '5px'}}>
+                    <Col style = {{width: '500px'}} >
+                        <Row>
+                            <b> Filter the stations on the map by group name, parameter, or date collected. </b>
+                        </Row>
+                        <Row style={{padding: '5px'}} className="justify-content-md-center">
+                            <Dropdowns placeholder={"Select a local group..."} options={this.state.GroupNames} label = {'GroupName'} callBack={this.setGroupName} />
+                        </Row>
+                        <Row style={{padding: '5px'}} className="justify-content-md-center">
+                            <Dropdowns placeholder={"Select a parameter..."} options={this.state.variables} label = {'variable'} callBack={this.setVariable} />
+                        </Row>
+                        <Row style={{paddingtop: '10px'}} className="justify-content-md-center">
+                            <DateRangePicker
+                                  startDate={this.state.startDate} // momentPropTypes.momentObj or null,
+                                  startDateId="your_unique_start_date_id" // PropTypes.string.isRequired,
+                                  endDate={this.state.endDate} // momentPropTypes.momentObj or null,
+                                  endDateId="your_unique_end_date_id" // PropTypes.string.isRequired,
+                                  onDatesChange={({ startDate, endDate }) => this.setDates(startDate, endDate)} // PropTypes.func.isRequired,
+                                  focusedInput={this.state.focusedInput} // PropTypes.oneOf([START_DATE, END_DATE]) or null,
+                                  onFocusChange={focusedInput => this.setState({ focusedInput })} // PropTypes.func.isRequired,
+                            />
+                        </Row>
+                    </Col>
+                </Row>
+                 <Row className="justify-content-md-center" style={{ border : "solid 1px #b1b5b5", backgroundColor: 'white', borderRadius: '25px', padding: '10px'}}>
+                    <Col>
+                        { selected.StationName !== null
+                        ? <b> Selected station: {selected.StationName} </b>
+                        : <b> Click a station on the map and select an available parameter to see data. </b>
+                        }
+                        <Dropdowns placeholder={"available parameters..."}
+                            options={this.state.availableVariablesAtLocation}
+                            label = {'variable'}
+                            callBack={this.setVariableAtLocation}
+                            />
+                        <Chart data = {this.state.chart_data} unit= {this.state.selected.unit} />
+                    </Col>
+                 </Row>
+            </Col>
+         </Row>
+         </Container>
+        );
+    }
+}
 
 export default Home
